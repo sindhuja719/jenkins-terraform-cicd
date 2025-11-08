@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'linux-agent' } // your agent node label
+    agent { label 'linux-agent' } // use the label you gave your agent in Jenkins
 
     environment {
         AWS_CREDENTIALS = credentials('aws-creds')
@@ -18,7 +18,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                    docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
                 }
             }
         }
@@ -26,11 +26,11 @@ pipeline {
         stage('Push to AWS ECR') {
             steps {
                 withAWS(credentials: 'aws-creds', region: 'us-east-1') {
-                    sh """
+                    sh '''
                         aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REPO
-                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
-                        docker push $ECR_REPO:${IMAGE_TAG}
-                    """
+                        docker tag $IMAGE_NAME:$IMAGE_TAG $ECR_REPO:$IMAGE_TAG
+                        docker push $ECR_REPO:$IMAGE_TAG
+                    '''
                 }
             }
         }
@@ -47,10 +47,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline completed successfully!"
+            echo "✅ Pipeline succeeded!"
         }
         failure {
-            echo "❌ Pipeline failed. Check the console output for details."
+            echo "❌ Pipeline failed!"
         }
     }
 }
