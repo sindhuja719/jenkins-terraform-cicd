@@ -2,17 +2,22 @@ pipeline {
     agent { label 'linux-agent' }
 
     environment {
-        AWS_CREDENTIALS = credentials('aws-creds')   // Jenkins credentials ID for AWS
+        AWS_CREDENTIALS = credentials('aws-creds')
         IMAGE_NAME = "flask-app"
-        IMAGE_TAG = "v1"
-        ECR_REPO = "312596057535.dkr.ecr.us-east-1.amazonaws.com/flask-app"
+        IMAGE_TAG = "v1.${BUILD_NUMBER}"
         REGION = "us-east-1"
+        ECR_REPO = "312596057535.dkr.ecr.us-east-1.amazonaws.com/flask-app"
+    }
+
+    triggers {
+        githubPush()  // 🔔 Webhook trigger - runs on every GitHub push
     }
 
     stages {
 
         stage('Checkout Code') {
             steps {
+                echo "📥 Checking out source code..."
                 git branch: 'main', url: 'https://github.com/sindhuja719/jenkins-terraform-cicd.git'
             }
         }
@@ -29,7 +34,7 @@ pipeline {
         stage('Push to AWS ECR') {
             steps {
                 script {
-                    echo "📦 Logging into AWS ECR and pushing image..."
+                    echo "🚀 Logging in and pushing image to AWS ECR..."
                     withAWS(credentials: 'aws-creds', region: "${REGION}") {
                         sh '''
                             aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REPO
@@ -44,6 +49,7 @@ pipeline {
         stage('Deploy with Terraform') {
             steps {
                 dir('terraform') {
+                    echo "⚙️ Running Terraform deployment..."
                     sh '''
                         terraform init -input=false
                         terraform apply -auto-approve
@@ -55,10 +61,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline completed successfully! Image pushed and deployed to AWS."
+            echo "✅ SUCCESS: Build, Push, and Deploy completed successfully!"
         }
         failure {
-            echo "❌ Pipeline failed. Check the console logs for more details."
+            echo "❌ FAILURE: Pipeline failed. Check console output for details."
         }
     }
 }
