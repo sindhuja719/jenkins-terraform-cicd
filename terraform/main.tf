@@ -11,13 +11,13 @@ provider "aws" {
   region = var.aws_region
 }
 
-# SSH key
+# SSH Key
 resource "aws_key_pair" "jenkins_key" {
   key_name   = "jenkins-key"
   public_key = file(var.public_key_path)
 }
 
-# Security group
+# Security Group for Jenkins Master & Agent
 resource "aws_security_group" "jenkins_sg" {
   name        = "jenkins-sg"
   description = "Allow SSH, Jenkins web, and agent traffic"
@@ -27,11 +27,11 @@ resource "aws_security_group" "jenkins_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] # For security, restrict to your IP
   }
 
   ingress {
-    description = "Jenkins Web UI (port 9090)"
+    description = "Jenkins Web UI"
     from_port   = 9090
     to_port     = 9090
     protocol    = "tcp"
@@ -64,10 +64,12 @@ resource "aws_instance" "jenkins_master" {
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
-              yum install -y docker
+              yum install -y docker git
               systemctl start docker
               usermod -aG docker ec2-user
-              docker run -d -p 9090:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts
+              mkdir -p /home/ec2-user/jenkins_home
+              docker run -d --name jenkins-master -p 9090:8080 -p 50000:50000 \
+                  -v /home/ec2-user/jenkins_home:/var/jenkins_home jenkins/jenkins:lts
               EOF
 
   tags = {
@@ -85,7 +87,12 @@ resource "aws_instance" "jenkins_agent" {
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
-              yum install -y java-11-amazon-corretto-headless
+              yum install -y java-11-amazon-corretto-headless git
+              mkdir -p /home/ec2-user/.ssh
+              echo "${aws_key_pair.jenkins_key.public_key}" >> /home/ec2-user/.ssh/authorized_keys
+              chmod 700 /home/ec2-user/.ssh
+              chmod 600 /home/ec2-user/.ssh/authorized_keys
+              chown -R ec2-user:ec2-user /home/ec2-user/.ssh
               EOF
 
   tags = {
@@ -93,6 +100,7 @@ resource "aws_instance" "jenkins_agent" {
   }
 }
 
+# Outputs
 output "jenkins_master_public_ip" {
   description = "Public IP of Jenkins Master"
   value       = aws_instance.jenkins_master.public_ip
@@ -101,4 +109,9 @@ output "jenkins_master_public_ip" {
 output "jenkins_agent_public_ip" {
   description = "Public IP of Jenkins Agent"
   value       = aws_instance.jenkins_agent.public_ip
+}
+
+output "jenkins_master_url" {
+  description = "URL of Jenkins Master Web UI"
+  value       = "http://${aws_instance.jenkins_master.public_ip}:9090"
 }
