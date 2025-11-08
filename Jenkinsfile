@@ -46,13 +46,11 @@ pipeline {
     }
 
     post {
-        always {
-            echo 'Pipeline finished.'
+        success {
+            echo "✅ Pipeline completed successfully!"
         }
         failure {
-            mail to: 'you@example.com',
-                 subject: "Pipeline Failed: ${currentBuild.fullDisplayName}",
-                 body: "Check Jenkins for details: ${env.BUILD_URL}"
+            echo "❌ Pipeline failed. Check the console output for details."
         }
     }
 }
