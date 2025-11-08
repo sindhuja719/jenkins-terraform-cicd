@@ -1,0 +1,43 @@
+# Node / IDE files
+.vscode/
+.idea/
+*.log
+*.swp
+*.swo
+
+# Python / Flask
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+*.env
+
+# Docker
+*.tar
+*.tar.gz
+*.img
+docker-compose.override.yml
+
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfplan
+*.tfvars
+
+# Jenkins
+*.war
+*.log
+workspace/
+builds/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Others
+*.zip
+*.tar
+*.bak
