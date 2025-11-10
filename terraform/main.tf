@@ -4,9 +4,10 @@ provider "aws" {
 
 # ---------- Key Pair ----------
 resource "aws_key_pair" "jenkins_key" {
-  key_name   = "jenkins-fresh-key"
-  public_key = file("C:/AccelDevops/jenkins-fresh-key-clean.pub")
+  key_name   = "jenkins-agent-key"
+  public_key = file("/home/ubuntu/.ssh/id_rsa.pub")
 }
+
 # ---------- Security Group ----------
 resource "aws_security_group" "jenkins_sg" {
   name        = "jenkins-sg"
