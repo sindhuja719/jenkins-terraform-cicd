@@ -10,7 +10,7 @@ resource "aws_key_pair" "jenkins_key" {
 
 # ---------- Security Group ----------
 resource "aws_security_group" "jenkins_sg" {
-  name        = "jenkins-sg"
+  name        = "jenkins-sg-new"
   description = "Allow SSH, Jenkins web, and agent traffic"
 
   ingress {
