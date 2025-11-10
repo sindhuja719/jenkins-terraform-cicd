@@ -12,9 +12,16 @@ variable "public_key" {
   description = "Public SSH key contents for EC2 key pair"
   type        = string
 }
+###############################################
+resource "random_id" "suffix" {
+  byte_length = 2
+}
 
+###############################################
+# KEY PAIR
+###############################################
 resource "aws_key_pair" "jenkins_key" {
-  key_name   = "jenkins-fresh-key"
+  key_name   = "jenkins-fresh-key-${random_id.suffix.hex}"
   public_key = var.public_key
 }
 
