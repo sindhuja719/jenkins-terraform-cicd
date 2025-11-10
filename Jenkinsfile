@@ -72,18 +72,28 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy with Terraform') {
             steps {
                 dir("${TF_DIR}") {
-                    echo "⚙️ Running Terraform deployment..."
-                    sh '''
-                        terraform init -input=false
-                        terraform apply -auto-approve
-                    '''
-                }
-            }
+                echo "⚙️ Running Terraform deployment..."
+                sh '''
+                    # Read the public key from the agent's .ssh directory
+                    if [ -f ~/.ssh/jenkins-fresh-key.pub ]; then
+                    PUB_KEY=$(cat ~/.ssh/jenkins-fresh-key.pub)
+                    else
+                    echo "❌ ERROR: Public key not found at ~/.ssh/jenkins-fresh-key.pub"
+                    exit 1
+                    fi
+
+                    terraform init -input=false
+                    terraform apply -auto-approve -var "public_key=${PUB_KEY}"
+                '''
         }
+    }
+}
+
+
+        
     }
 
     post {

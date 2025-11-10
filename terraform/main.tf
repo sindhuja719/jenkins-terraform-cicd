@@ -8,12 +8,16 @@ provider "aws" {
 ########################################
 # Key Pair
 ########################################
+variable "public_key" {
+  description = "Public SSH key contents for EC2 key pair"
+  type        = string
+}
+
 resource "aws_key_pair" "jenkins_key" {
   key_name   = "jenkins-fresh-key"
-
-  # Use a relative path so Jenkins agent (Linux) can read it
-  public_key = file("${path.module}/jenkins-fresh-key.pub")
+  public_key = var.public_key
 }
+
 
 ########################################
 # Networking - VPC, Subnet, IGW, Route Table
