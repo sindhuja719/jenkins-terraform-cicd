@@ -10,7 +10,9 @@ provider "aws" {
 ########################################
 resource "aws_key_pair" "jenkins_key" {
   key_name   = "jenkins-fresh-key"
-  public_key = file("C:/AccelDevops/jenkins-fresh-key.pub")
+
+  # Use a relative path so Jenkins agent (Linux) can read it
+  public_key = file("${path.module}/jenkins-fresh-key.pub")
 }
 
 ########################################
