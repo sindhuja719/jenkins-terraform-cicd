@@ -19,6 +19,6 @@ variable "ami_id" {
 variable "public_key_path" {
   description = "Path to your SSH public key"
   type        = string
-  default     = "/home/ubuntu/.ssh/id_rsa.pub"
+  default     = "~/.ssh/id_rsa.pub"
 }
 

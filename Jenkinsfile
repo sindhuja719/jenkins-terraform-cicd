@@ -60,6 +60,11 @@ pipeline {
     }
 
     post {
+        always {
+            sh '''
+                docker system prune -f
+        '''
+       }
         success {
             echo "✅ SUCCESS: Build, Push, and Deploy completed successfully!"
         }
