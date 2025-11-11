@@ -4,21 +4,20 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "key_name" {
+  description = "Key pair name for SSH access"
+  type        = string
+  default     = "jenkins-fresh-key"
+}
+
 variable "instance_type" {
-  description = "EC2 instance type"
+  description = "Instance type for Jenkins master and agent"
   type        = string
   default     = "t3.micro"
 }
 
-variable "ami_id" {
-  description = "Amazon Linux 2 AMI ID"
-  type        = string
-  default     = "ami-0866a3c8686eaeeba" # For us-east-1
-}
-
 variable "public_key_path" {
-  description = "Path to your SSH public key"
+  description = "Path to public key for AWS key pair"
   type        = string
-  default     = "~/.ssh/id_rsa.pub"
+  default     = "jenkins-new-key.pub"
 }
-

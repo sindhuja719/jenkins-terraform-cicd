@@ -1,50 +1,34 @@
-########################################
-# Provider Configuration
-########################################
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
 }
 
-########################################
-# Key Pair
-########################################
-variable "public_key" {
-  description = "Public SSH key contents for EC2 key pair"
-  type        = string
-}
-###############################################
-resource "random_id" "suffix" {
-  byte_length = 2
-}
-
-###############################################
-# KEY PAIR
-###############################################
+# ---------- Key Pair ----------
 resource "aws_key_pair" "jenkins_key" {
-  key_name   = "jenkins-fresh-key-${random_id.suffix.hex}"
-  public_key = var.public_key
+  key_name   = "jenkins-new-key"
+  public_key = file("${path.module}/jenkins-new-key.pub")
 }
 
 
-########################################
-# Networking - VPC, Subnet, IGW, Route Table
-########################################
+# ---------- Networking ----------
 resource "aws_vpc" "jenkins_vpc" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
   tags = { Name = "jenkins-vpc" }
 }
 
 resource "aws_internet_gateway" "jenkins_gw" {
   vpc_id = aws_vpc.jenkins_vpc.id
-  tags = { Name = "jenkins-gateway" }
+  tags   = { Name = "jenkins-gateway" }
 }
 
 resource "aws_subnet" "jenkins_subnet" {
   vpc_id                  = aws_vpc.jenkins_vpc.id
   cidr_block              = "10.0.1.0/24"
+  availability_zone       = "${var.aws_region}a"
   map_public_ip_on_launch = true
-  availability_zone       = "us-east-1a"
-  tags = { Name = "jenkins-public-subnet" }
+  tags                    = { Name = "jenkins-public-subnet" }
 }
 
 resource "aws_route_table" "jenkins_route_table" {
@@ -53,6 +37,7 @@ resource "aws_route_table" "jenkins_route_table" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.jenkins_gw.id
   }
+  tags = { Name = "jenkins-route-table" }
 }
 
 resource "aws_route_table_association" "jenkins_route_assoc" {
@@ -60,12 +45,10 @@ resource "aws_route_table_association" "jenkins_route_assoc" {
   route_table_id = aws_route_table.jenkins_route_table.id
 }
 
-########################################
-# Security Group
-########################################
+# ---------- Security Group ----------
 resource "aws_security_group" "jenkins_sg" {
-  name        = "jenkins-sg-new"
-  description = "Allow SSH, Jenkins web, and agent traffic"
+  name        = "jenkins-sg"
+  description = "Allow SSH, Jenkins web, and agent communication"
   vpc_id      = aws_vpc.jenkins_vpc.id
 
   ingress {
@@ -85,7 +68,7 @@ resource "aws_security_group" "jenkins_sg" {
   }
 
   ingress {
-    description = "Jenkins Master-Agent"
+    description = "Jenkins Agent Communication"
     from_port   = 50000
     to_port     = 50000
     protocol    = "tcp"
@@ -102,126 +85,90 @@ resource "aws_security_group" "jenkins_sg" {
   tags = { Name = "jenkins-sg" }
 }
 
-########################################
-# Jenkins Master Instance
-########################################
+# ---------- Jenkins Master ----------
 resource "aws_instance" "jenkins_master" {
-  ami                         = "ami-0c7217cdde317cfec" # Ubuntu 22.04
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.jenkins_subnet.id
+  ami                         = "ami-007855ac798b5175e" # Ubuntu 22.04 LTS
+  instance_type               = var.instance_type
   key_name                    = aws_key_pair.jenkins_key.key_name
+  subnet_id                   = aws_subnet.jenkins_subnet.id
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   associate_public_ip_address = true
 
-  # ----------- Install Docker, Terraform, AWS CLI, Jenkins ------------
   user_data = <<-EOF
     #!/bin/bash
+    set -e
     apt update -y
-    apt install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip git openjdk-17-jdk
+    apt install -y apt-transport-https ca-certificates curl software-properties-common gnupg git unzip
 
-    # Docker installation
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    apt update -y
-    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    # Install Docker
+    apt install -y docker.io
     systemctl enable docker
     systemctl start docker
     usermod -aG docker ubuntu
 
-    # Terraform installation
-    curl -fsSL https://releases.hashicorp.com/terraform/1.9.7/terraform_1.9.7_linux_amd64.zip -o terraform.zip
-    unzip terraform.zip
-    mv terraform /usr/local/bin/
-    rm terraform.zip
+    # Install Java 17
+    apt install -y openjdk-17-jdk
 
-    # AWS CLI installation
+    # Install AWS CLI
     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     unzip awscliv2.zip
     ./aws/install
 
-    # Jenkins in Docker
+    # Install Terraform
+    TERRAFORM_VERSION="1.9.7"
+    curl -fsSL https://releases.hashicorp.com/terraform/$${TERRAFORM_VERSION}/terraform_$${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip
+    unzip terraform.zip
+    mv terraform /usr/local/bin/
+
+
+    # Jenkins container
     mkdir -p /home/ubuntu/jenkins_home
+    chmod 777 /home/ubuntu/jenkins_home
     docker run -d --name jenkins-master -p 9090:8080 -p 50000:50000 \
       -v /home/ubuntu/jenkins_home:/var/jenkins_home \
+      -v /var/run/docker.sock:/var/run/docker.sock \
       jenkins/jenkins:lts
   EOF
 
   tags = { Name = "Jenkins-Master" }
 }
 
-########################################
-# Jenkins Agent Instance
-########################################
+# ---------- Jenkins Agent ----------
 resource "aws_instance" "jenkins_agent" {
-  ami                         = "ami-0c7217cdde317cfec" # Ubuntu 22.04
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.jenkins_subnet.id
+  ami                         = "ami-007855ac798b5175e"
+  instance_type               = var.instance_type
   key_name                    = aws_key_pair.jenkins_key.key_name
+  subnet_id                   = aws_subnet.jenkins_subnet.id
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   associate_public_ip_address = true
 
-  # ----------- Install Docker, Terraform, AWS CLI, Git, Java ------------
   user_data = <<-EOF
     #!/bin/bash
+    set -e
     apt update -y
-    apt install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip git openjdk-17-jdk
+    apt install -y apt-transport-https ca-certificates curl software-properties-common gnupg git unzip
 
-    # Docker installation
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    apt update -y
-    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    # Install Docker
+    apt install -y docker.io
     systemctl enable docker
     systemctl start docker
     usermod -aG docker ubuntu
 
-    # Terraform installation
-    curl -fsSL https://releases.hashicorp.com/terraform/1.9.7/terraform_1.9.7_linux_amd64.zip -o terraform.zip
-    unzip terraform.zip
-    mv terraform /usr/local/bin/
-    rm terraform.zip
+    # Install Java 17
+    apt install -y openjdk-17-jdk
 
-    # AWS CLI installation
+    # Install AWS CLI
     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     unzip awscliv2.zip
     ./aws/install
+
+    # Install Terraform
+    TERRAFORM_VERSION="1.9.7"
+    curl -fsSL https://releases.hashicorp.com/terraform/$${TERRAFORM_VERSION}/terraform_$${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip
+    unzip terraform.zip
+    mv terraform /usr/local/bin/
+
   EOF
 
   tags = { Name = "Jenkins-Agent" }
-}
-
-########################################
-# Elastic IPs (Permanent IPs)
-########################################
-resource "aws_eip" "jenkins_master_eip" {
-  instance   = aws_instance.jenkins_master.id
-  depends_on = [aws_instance.jenkins_master]
-  tags = { Name = "jenkins-master-eip" }
-}
-
-resource "aws_eip" "jenkins_agent_eip" {
-  instance   = aws_instance.jenkins_agent.id
-  depends_on = [aws_instance.jenkins_agent]
-  tags = { Name = "jenkins-agent-eip" }
-}
-
-########################################
-# Outputs
-########################################
-output "jenkins_master_public_ip" {
-  value = aws_eip.jenkins_master_eip.public_ip
-}
-
-output "jenkins_agent_public_ip" {
-  value = aws_eip.jenkins_agent_eip.public_ip
-}
-
-output "jenkins_master_url" {
-  value = "http://${aws_eip.jenkins_master_eip.public_ip}:9090"
 }
