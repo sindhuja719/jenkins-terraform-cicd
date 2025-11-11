@@ -1,26 +1,16 @@
-
-And add this content:
-```bash
-# Ignore Terraform and build files
+# Ignore Terraform build and provider files
 .terraform/
 *.tfstate
 *.tfstate.backup
 terraform.tfstate*
 *.log
 
-# Ignore Git metadata
+# Ignore Jenkins and Git metadata
 .git/
 .gitignore
-
-# Ignore Jenkins and temp files
 Jenkinsfile
-__pycache__/
-*.pyc
-*.pyo
-*.tmp
-*.swp
 
-# Ignore local files
+# Ignore local and sensitive files
 *.pem
 *.pub
 *.key
@@ -28,6 +18,11 @@ __pycache__/
 *.tar
 *.gz
 
-# Optional: ignore node_modules or venv if present
-node_modules/
+# Ignore Python caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Optional: if you have virtualenv or node_modules
 venv/
+node_modules/

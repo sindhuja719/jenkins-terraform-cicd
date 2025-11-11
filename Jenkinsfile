@@ -47,6 +47,16 @@ pipeline {
                 }
             }
         }
+        stage('Pre-Cleanup') {
+            steps {
+                echo "🧹 Cleaning up workspace and old Docker data..."
+                sh '''
+                    docker system prune -a --volumes -f || true
+                    rm -rf $WORKSPACE/terraform/.terraform || true
+                '''
+            }
+      }
+
 
         stage('Build Docker Image') {
             steps {
