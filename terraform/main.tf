@@ -2,12 +2,10 @@ provider "aws" {
   region = var.aws_region
 }
 
-# ---------- Key Pair ----------
-resource "aws_key_pair" "jenkins_key" {
-  key_name   = "jenkins-new-key"
-  public_key = file("${path.module}/jenkins-new-key.pub")
+# ---------- Key Pair (use existing key pair in AWS) ----------
+data "aws_key_pair" "jenkins_key" {
+  key_name = "jenkins-new-key"
 }
-
 
 # ---------- Networking ----------
 resource "aws_vpc" "jenkins_vpc" {
@@ -89,7 +87,7 @@ resource "aws_security_group" "jenkins_sg" {
 resource "aws_instance" "jenkins_master" {
   ami                         = "ami-007855ac798b5175e" # Ubuntu 22.04 LTS
   instance_type               = var.instance_type
-  key_name                    = aws_key_pair.jenkins_key.key_name
+  key_name                    = data.aws_key_pair.jenkins_key.key_name
   subnet_id                   = aws_subnet.jenkins_subnet.id
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   associate_public_ip_address = true
@@ -137,7 +135,7 @@ resource "aws_instance" "jenkins_master" {
 resource "aws_instance" "jenkins_agent" {
   ami                         = "ami-007855ac798b5175e"
   instance_type               = var.instance_type
-  key_name                    = aws_key_pair.jenkins_key.key_name
+  key_name                    = data.aws_key_pair.jenkins_key.key_name
   subnet_id                   = aws_subnet.jenkins_subnet.id
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   associate_public_ip_address = true
