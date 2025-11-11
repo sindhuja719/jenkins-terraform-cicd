@@ -16,8 +16,7 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-variable "public_key_path" {
-  description = "Path to public key for AWS key pair"
+variable "public_key" {
+  description = "Public SSH key contents for EC2 key pair"
   type        = string
-  default     = "jenkins-new-key.pub"
 }
