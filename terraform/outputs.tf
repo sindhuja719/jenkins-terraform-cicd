@@ -13,6 +13,7 @@ output "jenkins_master_url" {
   value       = "http://${aws_instance.jenkins_master.public_ip}:9090"
 }
 output "flask_app_url" {
-  value = "http://${aws_instance.jenkins_agent.public_ip}:5000"
-  description = "Public URL for the Flask app"
+  description = "Public URL to access the Flask app"
+  value       = "http://${aws_instance.jenkins_agent.public_ip}:5000"
 }
+
