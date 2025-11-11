@@ -101,6 +101,38 @@ pipeline {
         }
     }
 }
+        stage('Run Flask App Container') {
+            steps {
+                echo "🚀 Deploying Flask App on Jenkins Agent..."
+                sh '''
+                    # Stop any existing container with the same name
+                    sudo docker rm -f flask-app || true
+
+                    # Authenticate to ECR
+                    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 312596057535.dkr.ecr.us-east-1.amazonaws.com
+
+                    # Pull the latest image from ECR
+                    docker pull 312596057535.dkr.ecr.us-east-1.amazonaws.com/flask-app:v1.${BUILD_NUMBER}
+
+                    # Run the Flask container
+                    docker run -d --name flask-app -p 5000:5000 312596057535.dkr.ecr.us-east-1.amazonaws.com/flask-app:v1.${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Show Flask App URL') {
+            steps {
+                dir('terraform') {
+                    echo "🌍 Fetching the deployed app URL..."
+                    sh '''
+                        echo "--------------------------------------------"
+                        terraform output -raw flask_app_url
+                        echo "--------------------------------------------"
+                    '''
+                }
+            }
+        }
+
 
 
         
