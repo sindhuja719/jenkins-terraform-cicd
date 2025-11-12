@@ -86,22 +86,16 @@ pipeline {
             steps {
                 withCredentials([string(variable: 'PUB_KEY_CONTENT', credentialsId: 'jenkins-pub-key')]) {
                     dir("${TF_DIR}") {
-                        echo "⚙️ Running Terraform refresh-only (stable infra, no recreation)..."
+                        echo "⚙️ Running Terraform refresh (stable infra, no recreation)..."
                         sh '''
                             echo "✅ Using public key from Jenkins credentials."
-
                             terraform init -input=false
-
-                            # Pass the public key content directly to Terraform
-                            terraform apply -refresh-only -auto-approve -var "public_key=${PUB_KEY_CONTENT}"
+                            terraform refresh -var "public_key=${PUB_KEY_CONTENT}"
                         '''
                     }
                 }
             }
         }
-
-
-
 
         stage('Run Flask App Container') {
             steps {
