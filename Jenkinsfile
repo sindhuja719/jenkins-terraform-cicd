@@ -84,40 +84,24 @@ pipeline {
         }
         stage('Deploy with Terraform (Stable Refresh)') {
             steps {
-                dir("${TF_DIR}") {
-                    echo "⚙️ Running Terraform refresh-only (stable infra, no recreation)..."
-                    sh '''
-                        # Find the public key file in any known location
-                        PUB_KEY_FILE=""
-                        for path in \
-                            "/var/jenkins_home/.ssh/jenkins-new-key.pub" \
-                            "/home/ubuntu/jenkins_home/.ssh/jenkins-new-key.pub" \
-                            "/home/ubuntu/.ssh/jenkins-new-key.pub"; do
-                            if [ -f "$path" ]; then
-                                PUB_KEY_FILE="$path"
-                                break
-                            fi
-                        done
+                withCredentials([file(variable: 'PUB_KEY_FILE', credentialsId: 'jenkins-pub-key')]) {
+                    dir("${TF_DIR}") {
+                        echo "⚙️ Running Terraform refresh-only (stable infra, no recreation)..."
+                        sh '''
+                            echo "✅ Using Jenkins credential file: $PUB_KEY_FILE"
 
-                        if [ -z "$PUB_KEY_FILE" ]; then
-                            echo "❌ ERROR: No public key found in any known location!"
-                            exit 1
-                        fi
+                            # Read the key content from the Jenkins credential
+                            PUB_KEY_CONTENT=$(cat "$PUB_KEY_FILE")
 
-                        echo "✅ Found key at: $PUB_KEY_FILE"
+                            terraform init -input=false
 
-                        # Read key content safely into a variable
-                        PUB_KEY_CONTENT=$(cat "$PUB_KEY_FILE")
-
-                        # Terraform init
-                        terraform init -input=false
-
-                        # Run refresh-only with the key content directly
-                        terraform apply -refresh-only -auto-approve -var "public_key=${PUB_KEY_CONTENT}"
-                    '''
+                            terraform apply -refresh-only -auto-approve -var "public_key=${PUB_KEY_CONTENT}"
+                        '''
+                    }
                 }
             }
         }
+
 
 
         stage('Run Flask App Container') {
