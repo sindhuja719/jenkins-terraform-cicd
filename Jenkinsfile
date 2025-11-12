@@ -83,18 +83,25 @@ pipeline {
             }
         }
 
-        // stage('Deploy with Terraform') {
-        //     steps {
-        //         dir("${TF_DIR}") {
-        //             echo "⚙️ Running Terraform refresh only (no recreation)..."
-        //             sh '''
-        //                 # ✅ Use Terraform refresh only to keep infra stable
-        //                 terraform init -input=false
-        //                 terraform apply -refresh-only -auto-approve
-        //             '''
-        //         }
-        //     }
-        // }
+        stage('Deploy with Terraform (Stable Refresh)') {
+            steps {
+                dir("${TF_DIR}") {
+                    echo "⚙️ Running Terraform in refresh-only mode (infra stable)..."
+                    sh '''
+                        # ✅ Ensure public key exists
+                        PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
+                        if [ ! -f "$PUB_KEY_PATH" ]; then
+                            echo "❌ ERROR: Public key not found at $PUB_KEY_PATH"
+                            exit 1
+                        fi
+
+                        # ✅ Safe Terraform refresh mode (no infra recreation)
+                        terraform init -input=false
+                        terraform apply -refresh-only -auto-approve -var "public_key=$(cat $PUB_KEY_PATH)"
+                    '''
+                }
+            }
+        }
 
         stage('Run Flask App Container') {
             steps {
