@@ -87,11 +87,11 @@ pipeline {
                 dir("${TF_DIR}") {
                     echo "⚙️ Running Terraform in refresh-only mode (infra stable)..."
                     sh '''
-                        # Detect correct key location (inside Jenkins or on EC2 host)
-                        if [ -f "$HOME/.ssh/jenkins-new-key.pub" ]; then
+                        # Detect correct key location
+                        if [ -f "/var/jenkins_home/.ssh/jenkins-new-key.pub" ]; then
+                            PUB_KEY_PATH="/var/jenkins_home/.ssh/jenkins-new-key.pub"
+                        elif [ -f "$HOME/.ssh/jenkins-new-key.pub" ]; then
                             PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
-                        elif [ -f "/home/ubuntu/jenkins_home/.ssh/jenkins-new-key.pub" ]; then
-                            PUB_KEY_PATH="/home/ubuntu/jenkins_home/.ssh/jenkins-new-key.pub"
                         elif [ -f "/home/ubuntu/.ssh/jenkins-new-key.pub" ]; then
                             PUB_KEY_PATH="/home/ubuntu/.ssh/jenkins-new-key.pub"
                         else
@@ -104,14 +104,12 @@ pipeline {
                         # Initialize Terraform safely
                         terraform init -input=false
 
-                        # Refresh state (no resource creation or deletion)
+                        # Refresh state only — no infra recreation
                         terraform apply -refresh-only -auto-approve -var "public_key=$(cat $PUB_KEY_PATH)"
                     '''
                 }
             }
-   }
-
-        
+        }
 
         stage('Run Flask App Container') {
             steps {
