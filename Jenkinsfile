@@ -82,31 +82,36 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy with Terraform (Stable Refresh)') {
             steps {
                 dir("${TF_DIR}") {
                     echo "⚙️ Running Terraform in refresh-only mode (infra stable)..."
                     sh '''
-                        # Try both possible key locations
-                        #if [ -f "$HOME/.ssh/jenkins-new-key.pub" ]; then
-                            #PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
-                        #elif [ -f "/home/ubuntu/.ssh/jenkins-new-key.pub" ]; then
-                            #PUB_KEY_PATH="/home/ubuntu/.ssh/jenkins-new-key.pub"
-                        #else
-                            #echo "❌ ERROR: Public key not found in either Jenkins or EC2 .ssh directory"
-                            #exit 1
-                        #fi
-                        PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
+                        # Detect correct key location (inside Jenkins or on EC2 host)
+                        if [ -f "$HOME/.ssh/jenkins-new-key.pub" ]; then
+                            PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
+                        elif [ -f "/home/ubuntu/jenkins_home/.ssh/jenkins-new-key.pub" ]; then
+                            PUB_KEY_PATH="/home/ubuntu/jenkins_home/.ssh/jenkins-new-key.pub"
+                        elif [ -f "/home/ubuntu/.ssh/jenkins-new-key.pub" ]; then
+                            PUB_KEY_PATH="/home/ubuntu/.ssh/jenkins-new-key.pub"
+                        else
+                            echo "❌ ERROR: Public key not found in any expected directory"
+                            exit 1
+                        fi
 
-                        echo "Using public key from: $PUB_KEY_PATH"
-                        # ✅ Safe Terraform refresh mode (no infra recreation)
+                        echo "✅ Using public key from: $PUB_KEY_PATH"
+
+                        # Initialize Terraform safely
                         terraform init -input=false
+
+                        # Refresh state (no resource creation or deletion)
                         terraform apply -refresh-only -auto-approve -var "public_key=$(cat $PUB_KEY_PATH)"
                     '''
                 }
             }
-        }
+   }
+
+        
 
         stage('Run Flask App Container') {
             steps {
