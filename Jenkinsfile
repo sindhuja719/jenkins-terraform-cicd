@@ -84,23 +84,22 @@ pipeline {
         }
         stage('Deploy with Terraform (Stable Refresh)') {
             steps {
-                withCredentials([file(variable: 'PUB_KEY_FILE', credentialsId: 'jenkins-pub-key')]) {
+                withCredentials([string(variable: 'PUB_KEY_CONTENT', credentialsId: 'jenkins-pub-key')]) {
                     dir("${TF_DIR}") {
                         echo "⚙️ Running Terraform refresh-only (stable infra, no recreation)..."
                         sh '''
-                            echo "✅ Using Jenkins credential file: $PUB_KEY_FILE"
-
-                            # Read the key content from the Jenkins credential
-                            PUB_KEY_CONTENT=$(cat "$PUB_KEY_FILE")
+                            echo "✅ Using public key from Jenkins credentials."
 
                             terraform init -input=false
 
+                            # Pass the public key content directly to Terraform
                             terraform apply -refresh-only -auto-approve -var "public_key=${PUB_KEY_CONTENT}"
                         '''
                     }
                 }
             }
         }
+
 
 
 
