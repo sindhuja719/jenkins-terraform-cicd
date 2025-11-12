@@ -2,7 +2,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# ---------- Key Pair (use existing key pair in AWS) ----------
+# ---------- Use Existing Key Pair ----------
 data "aws_key_pair" "jenkins_key" {
   key_name = "jenkins-new-key"
 }
@@ -46,7 +46,7 @@ resource "aws_route_table_association" "jenkins_route_assoc" {
 # ---------- Security Group ----------
 resource "aws_security_group" "jenkins_sg" {
   name        = "jenkins-sg"
-  description = "Allow SSH, Jenkins web, and agent communication"
+  description = "Allow SSH, Jenkins web, and Flask app"
   vpc_id      = aws_vpc.jenkins_vpc.id
 
   ingress {
@@ -72,14 +72,14 @@ resource "aws_security_group" "jenkins_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-    ingress {
+
+  ingress {
     description = "Flask App"
     from_port   = 5000
     to_port     = 5000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
 
   egress {
     from_port   = 0
@@ -99,6 +99,11 @@ resource "aws_instance" "jenkins_master" {
   subnet_id                   = aws_subnet.jenkins_subnet.id
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   associate_public_ip_address = true
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [ami, user_data, tags]
+  }
 
   user_data = <<-EOF
     #!/bin/bash
@@ -125,7 +130,6 @@ resource "aws_instance" "jenkins_master" {
     curl -fsSL https://releases.hashicorp.com/terraform/$${TERRAFORM_VERSION}/terraform_$${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip
     unzip terraform.zip
     mv terraform /usr/local/bin/
-
 
     # Jenkins container
     mkdir -p /home/ubuntu/jenkins_home
@@ -148,6 +152,11 @@ resource "aws_instance" "jenkins_agent" {
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
   associate_public_ip_address = true
 
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [ami, user_data, tags]
+  }
+
   user_data = <<-EOF
     #!/bin/bash
     set -e
@@ -173,7 +182,6 @@ resource "aws_instance" "jenkins_agent" {
     curl -fsSL https://releases.hashicorp.com/terraform/$${TERRAFORM_VERSION}/terraform_$${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip
     unzip terraform.zip
     mv terraform /usr/local/bin/
-
   EOF
 
   tags = { Name = "Jenkins-Agent" }

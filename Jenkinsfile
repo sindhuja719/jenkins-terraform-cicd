@@ -2,17 +2,17 @@ pipeline {
     agent { label 'linux-agent' }
 
     environment {
-        AWS_CREDENTIALS = credentials('aws-creds')           // Jenkins credential ID for AWS Access Key & Secret
+        AWS_CREDENTIALS = credentials('aws-creds')
         IMAGE_NAME = "flask-app"
         IMAGE_TAG = "v1.${BUILD_NUMBER}"
         REGION = "us-east-1"
         ACCOUNT_ID = "312596057535"
         ECR_REPO = "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${IMAGE_NAME}"
-        TF_DIR = "terraform"                                // Terraform directory path in your repo
+        TF_DIR = "terraform"
     }
 
     triggers {
-        githubPush() // 🔔 Trigger pipeline on every GitHub push
+        githubPush()
     }
 
     stages {
@@ -47,6 +47,7 @@ pipeline {
                 }
             }
         }
+
         stage('Pre-Cleanup') {
             steps {
                 echo "🧹 Cleaning up workspace and old Docker data..."
@@ -55,8 +56,7 @@ pipeline {
                     rm -rf $WORKSPACE/terraform/.terraform || true
                 '''
             }
-      }
-
+        }
 
         stage('Build Docker Image') {
             steps {
@@ -82,39 +82,31 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy with Terraform') {
             steps {
                 dir("${TF_DIR}") {
-                echo "⚙️ Running Terraform deployment..."
-                sh '''
-                    # Read the public key from the agent's .ssh directory
-                    if [ -f ~/.ssh/jenkins-fresh-key.pub ]; then
-                    PUB_KEY=$(cat ~/.ssh/jenkins-fresh-key.pub)
-                    else
-                    echo "❌ ERROR: Public key not found at ~/.ssh/jenkins-fresh-key.pub"
-                    exit 1
-                    fi
-
-                    terraform init -input=false
-                    terraform apply -auto-approve -var "public_key=${PUB_KEY}"
-                '''
+                    echo "⚙️ Running Terraform refresh only (no recreation)..."
+                    sh '''
+                        # ✅ Use Terraform refresh only to keep infra stable
+                        terraform init -input=false
+                        terraform apply -refresh-only -auto-approve
+                    '''
+                }
+            }
         }
-    }
-}
+
         stage('Run Flask App Container') {
             steps {
                 echo "🚀 Deploying Flask App on Jenkins Agent..."
                 sh '''
-                    # Stop any existing container with the same name
                     sudo docker rm -f flask-app || true
 
-                    # Authenticate to ECR
                     aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 312596057535.dkr.ecr.us-east-1.amazonaws.com
 
-                    # Pull the latest image from ECR
                     docker pull 312596057535.dkr.ecr.us-east-1.amazonaws.com/flask-app:v1.${BUILD_NUMBER}
 
-                    # Run the Flask container
+                    # ✅ Run container safely on same agent
                     docker run -d --name flask-app -p 5000:5000 312596057535.dkr.ecr.us-east-1.amazonaws.com/flask-app:v1.${BUILD_NUMBER}
                 '''
             }
@@ -123,27 +115,20 @@ pipeline {
         stage('Show Flask App URL') {
             steps {
                 dir('terraform') {
-                    echo "🌍 Fetching the deployed app URL..."
-                    sh '''
-                        echo "--------------------------------------------"
-                        terraform output -raw flask_app_url
-                        echo "--------------------------------------------"
-                    '''
+                    script {
+                        echo "🌍 Fetching the deployed app URL..."
+                        def flaskURL = sh(script: 'terraform output -raw flask_app_url', returnStdout: true).trim()
+                        echo "✅ Flask App is Live at: ${flaskURL}"   // ✅ Prints cleanly in Jenkins log
+                    }
                 }
             }
         }
-
-
-
-        
     }
 
     post {
         always {
             echo "🧹 Cleaning up Docker images and cache..."
-            sh '''
-                docker system prune -f
-            '''
+            sh 'docker system prune -f || true'
         }
         success {
             echo "✅ SUCCESS: Build, Push, and Deploy completed successfully!"
