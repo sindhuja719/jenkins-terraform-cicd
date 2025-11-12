@@ -83,18 +83,18 @@ pipeline {
             }
         }
 
-        stage('Deploy with Terraform') {
-            steps {
-                dir("${TF_DIR}") {
-                    echo "⚙️ Running Terraform refresh only (no recreation)..."
-                    sh '''
-                        # ✅ Use Terraform refresh only to keep infra stable
-                        terraform init -input=false
-                        terraform apply -refresh-only -auto-approve
-                    '''
-                }
-            }
-        }
+        // stage('Deploy with Terraform') {
+        //     steps {
+        //         dir("${TF_DIR}") {
+        //             echo "⚙️ Running Terraform refresh only (no recreation)..."
+        //             sh '''
+        //                 # ✅ Use Terraform refresh only to keep infra stable
+        //                 terraform init -input=false
+        //                 terraform apply -refresh-only -auto-approve
+        //             '''
+        //         }
+        //     }
+        // }
 
         stage('Run Flask App Container') {
             steps {
