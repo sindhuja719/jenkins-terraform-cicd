@@ -88,13 +88,16 @@ pipeline {
                 dir("${TF_DIR}") {
                     echo "⚙️ Running Terraform in refresh-only mode (infra stable)..."
                     sh '''
-                        # ✅ Ensure public key exists
-                        PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
-                        if [ ! -f "$PUB_KEY_PATH" ]; then
-                            echo "❌ ERROR: Public key not found at $PUB_KEY_PATH"
+                        # Try both possible key locations
+                        if [ -f "$HOME/.ssh/jenkins-new-key.pub" ]; then
+                            PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
+                        elif [ -f "/home/ubuntu/.ssh/jenkins-new-key.pub" ]; then
+                            PUB_KEY_PATH="/home/ubuntu/.ssh/jenkins-new-key.pub"
+                        else
+                            echo "❌ ERROR: Public key not found in either Jenkins or EC2 .ssh directory"
                             exit 1
                         fi
-
+                        echo "Using public key from: $PUB_KEY_PATH"
                         # ✅ Safe Terraform refresh mode (no infra recreation)
                         terraform init -input=false
                         terraform apply -refresh-only -auto-approve -var "public_key=$(cat $PUB_KEY_PATH)"
