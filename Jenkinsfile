@@ -85,31 +85,40 @@ pipeline {
         stage('Deploy with Terraform (Stable Refresh)') {
             steps {
                 dir("${TF_DIR}") {
-                    echo "⚙️ Running Terraform in refresh-only mode (infra stable)..."
+                    echo "⚙️ Running Terraform refresh-only (stable infra, no recreation)..."
                     sh '''
-                        # Detect correct key location
-                        if [ -f "/var/jenkins_home/.ssh/jenkins-new-key.pub" ]; then
-                            PUB_KEY_PATH="/var/jenkins_home/.ssh/jenkins-new-key.pub"
-                        elif [ -f "$HOME/.ssh/jenkins-new-key.pub" ]; then
-                            PUB_KEY_PATH="$HOME/.ssh/jenkins-new-key.pub"
-                        elif [ -f "/home/ubuntu/.ssh/jenkins-new-key.pub" ]; then
-                            PUB_KEY_PATH="/home/ubuntu/.ssh/jenkins-new-key.pub"
-                        else
-                            echo "❌ ERROR: Public key not found in any expected directory"
+                        # Find the public key file in any known location
+                        PUB_KEY_FILE=""
+                        for path in \
+                            "/var/jenkins_home/.ssh/jenkins-new-key.pub" \
+                            "/home/ubuntu/jenkins_home/.ssh/jenkins-new-key.pub" \
+                            "/home/ubuntu/.ssh/jenkins-new-key.pub"; do
+                            if [ -f "$path" ]; then
+                                PUB_KEY_FILE="$path"
+                                break
+                            fi
+                        done
+
+                        if [ -z "$PUB_KEY_FILE" ]; then
+                            echo "❌ ERROR: No public key found in any known location!"
                             exit 1
                         fi
 
-                        echo "✅ Using public key from: $PUB_KEY_PATH"
+                        echo "✅ Found key at: $PUB_KEY_FILE"
 
-                        # Initialize Terraform safely
+                        # Read key content safely into a variable
+                        PUB_KEY_CONTENT=$(cat "$PUB_KEY_FILE")
+
+                        # Terraform init
                         terraform init -input=false
 
-                        # Refresh state only — no infra recreation
-                        terraform apply -refresh-only -auto-approve -var "public_key=$(cat $PUB_KEY_PATH)"
+                        # Run refresh-only with the key content directly
+                        terraform apply -refresh-only -auto-approve -var "public_key=${PUB_KEY_CONTENT}"
                     '''
                 }
             }
         }
+
 
         stage('Run Flask App Container') {
             steps {
